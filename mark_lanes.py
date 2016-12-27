@@ -16,8 +16,8 @@ def visualize(img,img2,img3,fname):
     f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20,10))
     ax1.imshow(img)
     ax1.set_title(fname, fontsize=20)
-    ax2.imshow(img2)
-    ax3.imshow(img3)
+    ax2.imshow(img2,cmap='gray')
+    ax3.imshow(img3,cmap='gray')
 
     return ax2,ax3
 
@@ -225,9 +225,9 @@ def lane_points(warped, prevlane, line):
       bestline = comparelines(prevlane, bestline, line)
       #print("received ",cfilter, threshold,bestline.points.shape[0],line.points.shape[0])
 
-      if(0): #debug
+      if(0 and bestline is not None): #debug
         print("found left?",line.isLeft,cfilter,threshold)
-        ax2,ax3 = visualize(warped,img,img, "in lane_points")
+        ax2,ax3 = visualize(warped,img,img, "in lane_points "+str(line.isLeft))
         pts = np.array(points)
         ax2.plot(pts[:,0],pts[:,1], 'o', color='red')
         ax2.set_title(cfilter + " " + str(threshold) )
@@ -237,7 +237,7 @@ def lane_points(warped, prevlane, line):
         plt.show()
 
   #end of for theshold
-  if(0 and bestline.points is not None): #debug
+  if(0 and bestline is not None): #debug
     print("best line for",line.isLeft, cfilter,bestline.threshold)
 
   return bestline
@@ -247,16 +247,26 @@ def lane_points(warped, prevlane, line):
 """
 def islinevalid(prevlane, line):
   shiftAllowed = 10
+  leftintLimit = 200
   # If the xintercept and xintercept0 of line are within shiftAllowed from prevLane
   # return True
-  bottomshift = abs(line.intercept - prevlane.intercept)
-  topshift = abs(line.intercept0 - prevlane.intercept0)
-  #print("shift",line.isLeft,bottomshift,topshift)
-  if((bottomshift <= shiftAllowed) and
-    (topshift <= shiftAllowed)):
-    return True
-  else:
+  if(prevlane is not None):
+    bottomshift = abs(line.intercept - prevlane.intercept)
+    topshift = abs(line.intercept0 - prevlane.intercept0)
+    #print("shift",line.isLeft,bottomshift,topshift)
+    if((bottomshift > shiftAllowed) or
+      (topshift > shiftAllowed)):
+      return False
+
+  #print("coeff = ",line.isLeft, line.cfilter, line.fitcoeff[1])
+  if(abs(line.fitcoeff[1]) > 0.75):
     return False
+
+  #Adding a check to avoid 1st image of challenge mistaken by white filter
+  if(line.isLeft and line.intercept >= leftintLimit):
+    return False
+
+  return True
 
 """ comparelines compares current line with prev line
     if the line is valid line compared with prevline then it compares it with
@@ -265,60 +275,47 @@ def islinevalid(prevlane, line):
 """
 def comparelines(prevlane, bestline, line):
 
-  if(prevlane is None and bestline is None):
-    return deepcopy(line) #We have nothing to compare against
-
-  if(bestline is None and prevlane is not None):
+  #if line is valid an nothing to compare against we return the line
+  # else none
+  if(bestline is None):
     if islinevalid(prevlane, line):
+      #print("returning back line",line.isLeft,line.cfilter,line.threshold )
       return deepcopy(line) #We have nothing to compare against
     else:
+      #print ("returning None")
       return None
 
-  if(prevlane is None): #We have to compare with bestline only
+  # If we are here then we have bestline. Still if line is not valid return
+  # bestline , else compare this line with bestline
+  if islinevalid(prevlane, line) is False:
+    #print("returning bestline",bestline.isLeft,bestline.cfilter,bestline.threshold )
+    return bestline
 
-    lineunique = np.unique(line.points[:,1]).shape[0]
-    linexspread = max(line.points[:,0]) - min(line.points[:,0])
-    bestunique = np.unique(bestline.points[:,1]).shape[0]
-    bestxspread = max(bestline.points[:,0]) - min(bestline.points[:,0])
+  lineunique = np.unique(line.points[:,1]).shape[0]
+  linexspread = max(line.points[:,0]) - min(line.points[:,0])
+  bestunique = np.unique(bestline.points[:,1]).shape[0]
+  bestxspread = max(bestline.points[:,0]) - min(bestline.points[:,0])
 
-    if(0):
-      print("Comparing bestline",line.isLeft, bestline.cfilter,bestline.threshold, bestunique,bestxspread,'with',
-              line.cfilter,line.threshold, lineunique,linexspread)
-    limit = 10
-    # if we have more than limit lineunique take line with less xspread
-    if((lineunique < 15 and lineunique > bestunique) or
-       (lineunique >= 15 and linexspread < bestxspread )):
+  if(0):
+    print("Comparing bestline",line.isLeft, bestline.cfilter,bestline.threshold, bestunique,bestxspread,'with',
+            line.cfilter,line.threshold, lineunique,linexspread)
+  limit = 10
+  # if we have more than limit lineunique take line with less xspread
+  if((lineunique < 15 and lineunique > bestunique) or
+     (lineunique >= 15 and linexspread < bestxspread )):
 
-      prevbestline = bestline
-      prevbestunique = bestunique
-      bestline = deepcopy(line)
-      bestunique = lineunique
-      bestxspread = linexspread
+    if(0): #debug
+      print("selected new bestline:",line.isLeft,line.cfilter,line.threshold ,lineunique,linexspread,
+        "old bestline",bestline.isLeft,bestline.cfilter,bestline.threshold ,bestunique,bestxspread)
+    prevbestline = bestline
+    prevbestunique = bestunique
+    bestline = deepcopy(line)
+    bestunique = lineunique
+    bestxspread = linexspread
 
-      if(0): #debug
-        print("selected :",line.isLeft,line.cfilter ,bestunique,bestxspread)
-
-  elif(prevlane is not None):
-    if islinevalid(prevlane, line) is False:
-      return bestline
-
-    lineunique = np.unique(line.points[:,1]).shape[0]
-    linexspread = max(line.points[:,0]) - min(line.points[:,0])
-    bestunique = np.unique(bestline.points[:,1]).shape[0]
-    bestxspread = max(bestline.points[:,0]) - min(bestline.points[:,0])
-
-    if(0):
-      print("Comparing bestline",bestline.cfilter,bestline.threshold, bestunique,bestxspread,'with',
-              line.cfilter,line.threshold, lineunique,linexspread)
-    if(lineunique > bestunique): # or
-      #(lineunique == bestunique and linexspread < bestxspread )):
-
-      prevbestline = bestline
-      prevbestunique = bestunique
-      bestline = deepcopy(line)
-      bestunique = lineunique
-      bestxspread = linexspread
-
+  #else:
+   # print("returning bestline2",bestline.isLeft,bestline.cfilter,bestline.threshold,
+   #       "as", bestunique,bestxspread, "better than",line.cfilter,line.threshold, lineunique,linexspread)
   return bestline
 
 """ Given an input image find the best points that can make a lane
@@ -327,24 +324,30 @@ def comparelines(prevlane, bestline, line):
     3. compare lane for each color filter with last n images
     4. returns best lane
 """
-def best_fit_line(img, prevlane, isLeft):
-  img = region_of_interest(img)
-  bestline = None
+def best_fit_line(warped, prevlane, isLeft):
+  warped = region_of_interest(warped)
 
-  colorfilters = ['yellow','white']
-  #colorfilters = ['white']
+  #colorfilters = ['yellow','white']
+  colorfilters = ['white','yellow']
+  #colorfilters = ['yellow']
+  bestline = None
+  images = [warped,warped]
+  i=0
   for cfilter in colorfilters:
     line = Line()
     line.isLeft = isLeft
     line.cfilter = cfilter
-    line = lane_points(img, prevlane, line)
-
+    line = lane_points(images[i], prevlane, line)
+    i=i+1
     if(line is None):
       continue #try another cfilter
 
     if(0): #debug
-      ax2,ax3 = visualize(img,img,img, "in best_fit_line")
+      ax2,ax3 = visualize(warped,warped,warped, "in best_fit_line "+str(line.isLeft))
+      ax2.set_title(line.cfilter +"="+str(line.threshold))
       drawpoints(ax2,line)
+      if(bestline is not None):
+        ax3.set_title(bestline.cfilter +"="+str(bestline.threshold))
       drawpoints(ax3,bestline)
       plt.show()
 
@@ -357,7 +360,7 @@ def best_fit_line(img, prevlane, isLeft):
   #  return prevlane #that is the best we have.
   #else:
   #  bestline.detected = True
-    return bestline
+  return bestline
 
 """ Input is a warped image we need to return the best left & right lanes
     1. split image into left & right
@@ -422,7 +425,8 @@ def averagelane(line, prevlane):
 
   #assert(line.isLeft == prevlane.isLeft), "lanes should have same isLeft"
   if(prevlane is not None and
-      len(prevlane.recent_xpoints)== N):
+      len(prevlane.recent_xpoints) >= N):
+    #print("N = ",N)
     prevlane.recent_xpoints.pop(0) #remove oldest point only
   #add new points
   if(line is not None and prevlane is not None):
@@ -445,16 +449,41 @@ def averagelane(line, prevlane):
     line.fitcoeff,_, _, _, _ = np.polyfit(yvals, fitx, 2, full=True)
     #print("left=",line.isLeft,"fit=",fit,"residual = ",residuals)
     line.detected = True
-  elif(prevlane is None):
+  elif(prevlane is None and line is not None and line.fitpoints.shape[0] > 0):
+    #print("shape",line.fitpoints.shape)
     xpoints = line.fitpoints[:,0] #this is an array
     xpoints = xpoints.tolist() #make this a list.
     line.recent_xpoints = [xpoints]
     line.detected = True
   else:
     line = prevlane
-    line.detected = False
+    if(line is not None):
+      line.detected = False
   return line
 
+""" extrapolateleft subtracts lanewidth from right line points
+"""
+def extrapolateleft(rightline):
+  LANEWIDTH = 313
+
+  left = deepcopy(rightline)
+  left.detected = False
+  left.recent_xpoints = [] #initialize
+  left.fitpoints[:,0] = left.fitpoints[:,0] - LANEWIDTH
+
+  return left
+
+""" extrapolateright adds lanewidth to leftlane points
+"""
+def extrapolateright(leftline):
+  LANEWIDTH = 280
+
+  right = deepcopy(leftline)
+  right.detected = False
+  right.recent_xpoints = [] #initialize
+  right.fitpoints[:,0] = right.fitpoints[:,0] + LANEWIDTH
+
+  return right
 
 """ final_lanes take is historic perspective. It averages best n lanes if a
   line was found. If it is not found it takes from prevlane is prev is not None
@@ -471,13 +500,13 @@ def final_lanes(left, right, prevleft, prevright):
     right = averagelane(right,prevright)
 
   if(left is None and prevleft is None and right is not None):
-    left = extrpolateleft (right)
+    left = extrapolateleft (right)
     left.detected = False
-    print("Left lane expolated")
+    print("Leftlane extrapolated")
   if(right is None and prevright is None and left is not None):
-    right = extrpolateright (left)
+    right = extrapolateright (left)
     right.detected = False
-    print("rightlane expolated")
+    print("rightlane extrapolated")
 
   if(left is None):
     print("ASSERT: left is None")
@@ -496,7 +525,6 @@ def final_lanes(left, right, prevleft, prevright):
     7. Return image, left, right lane object
 """
 def process_img(originalimg, prevleft=None, prevright=None):
-
   global mtx, dist,M #added so we read mtx only once
 
   if(mtx is None or dist is None or M is None): #read these only once for efficiency

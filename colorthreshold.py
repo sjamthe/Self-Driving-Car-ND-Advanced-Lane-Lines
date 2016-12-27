@@ -95,7 +95,7 @@ def yellow_threshold(warped, limit=180):
     g_channel = warped[:,:,1]
     b_channel = warped[:,:,2]
 
-    yellow = warped
+    yellow = np.array(warped, copy=True)
     #subtract the blue color
     yellow[b_channel > 110] = 0 #80-120 worked
     #plt.imshow(yellow)
