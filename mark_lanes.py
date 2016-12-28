@@ -61,8 +61,9 @@ def polyfit(img, line):
   cnt=0
   for (x, y) in zip(fitx, ys):
     x = int(x)
-    if(x >= xmin and x<= xmax):
-      points.append([x,y])
+    #if(x >= xmin and x<= xmax): this is causing problems with average_points
+    #as now we have arrays of unequal size!
+    points.append([x,y])
 
   line.fitpoints = np.array(points)
   return line
@@ -222,7 +223,7 @@ def lane_points(warped, prevlane, line):
       line.points = np.array(points)
 
       line = polyfit(img, line)
-      bestline = comparelines(prevlane, bestline, line)
+      bestline = comparelines(None, bestline, line)
       #print("received ",cfilter, threshold,bestline.points.shape[0],line.points.shape[0])
 
       if(0 and bestline is not None): #debug
@@ -253,10 +254,13 @@ def islinevalid(prevlane, line):
   if(prevlane is not None):
     bottomshift = abs(line.intercept - prevlane.intercept)
     topshift = abs(line.intercept0 - prevlane.intercept0)
-    #print("shift",line.isLeft,bottomshift,topshift)
-    if((bottomshift > shiftAllowed) or
-      (topshift > shiftAllowed)):
+    #debug
+    #if(1 and line.isLeft):
+      #print("shift",line.isLeft,bottomshift,topshift,line.intercept,prevlane.intercept)
+    if(bottomshift > shiftAllowed):
       return False
+    #if(topshift > shiftAllowed):
+    #  return False
 
   #print("coeff = ",line.isLeft, line.cfilter, line.fitcoeff[1])
   if(abs(line.fitcoeff[1]) > 0.75):
@@ -264,6 +268,7 @@ def islinevalid(prevlane, line):
 
   #Adding a check to avoid 1st image of challenge mistaken by white filter
   if(line.isLeft and line.intercept >= leftintLimit):
+    #print("rejecting line as leftintLimit exceeded",line.intercept)
     return False
 
   return True
@@ -299,23 +304,39 @@ def comparelines(prevlane, bestline, line):
   if(0):
     print("Comparing bestline",line.isLeft, bestline.cfilter,bestline.threshold, bestunique,bestxspread,'with',
             line.cfilter,line.threshold, lineunique,linexspread)
-  limit = 10
+  highlimit = 10
+  lowlimit = 3
   # if we have more than limit lineunique take line with less xspread
-  if((lineunique < 15 and lineunique > bestunique) or
-     (lineunique >= 15 and linexspread < bestxspread )):
+  if((lineunique >= lowlimit and lineunique <= highlimit) or
+    (bestunique >= lowlimit and bestunique <= highlimit)):
 
-    if(0): #debug
-      print("selected new bestline:",line.isLeft,line.cfilter,line.threshold ,lineunique,linexspread,
-        "old bestline",bestline.isLeft,bestline.cfilter,bestline.threshold ,bestunique,bestxspread)
-    prevbestline = bestline
-    prevbestunique = bestunique
-    bestline = deepcopy(line)
-    bestunique = lineunique
-    bestxspread = linexspread
+    if(lineunique > bestunique):
 
+      if(0): #debug
+        print("selected new bestline based on unique:",line.isLeft,line.cfilter,line.threshold ,lineunique,linexspread,
+          "old bestline",bestline.isLeft,bestline.cfilter,bestline.threshold ,bestunique,bestxspread)
+
+      prevbestline = bestline
+      prevbestunique = bestunique
+      bestline = deepcopy(line)
+      bestunique = lineunique
+      bestxspread = linexspread
+  elif(lineunique > highlimit and bestunique > highlimit):
+    if(linexspread < bestxspread):
+      if(0): #debug
+        print("selected new bestline based on xspread:",line.isLeft,line.cfilter,line.threshold ,lineunique,linexspread,
+          "old bestline",bestline.isLeft,bestline.cfilter,bestline.threshold ,bestunique,bestxspread)
+
+      prevbestline = bestline
+      prevbestunique = bestunique
+      bestline = deepcopy(line)
+      bestunique = lineunique
+      bestxspread = linexspread
   #else:
-   # print("returning bestline2",bestline.isLeft,bestline.cfilter,bestline.threshold,
-   #       "as", bestunique,bestxspread, "better than",line.cfilter,line.threshold, lineunique,linexspread)
+      #no change, keep old bestline
+
+  #print("returning bestline2",bestline.isLeft,bestline.cfilter,bestline.threshold)
+
   return bestline
 
 """ Given an input image find the best points that can make a lane
@@ -331,14 +352,13 @@ def best_fit_line(warped, prevlane, isLeft):
   colorfilters = ['white','yellow']
   #colorfilters = ['yellow']
   bestline = None
-  images = [warped,warped]
-  i=0
+
   for cfilter in colorfilters:
     line = Line()
     line.isLeft = isLeft
     line.cfilter = cfilter
-    line = lane_points(images[i], prevlane, line)
-    i=i+1
+    line = lane_points(warped, prevlane, line)
+
     if(line is None):
       continue #try another cfilter
 
@@ -424,30 +444,38 @@ def averagelane(line, prevlane):
   N = 3
 
   #assert(line.isLeft == prevlane.isLeft), "lanes should have same isLeft"
-  if(prevlane is not None and
-      len(prevlane.recent_xpoints) >= N):
+  #if(prevlane is not None and
+  #    len(prevlane.recent_xpoints) >= N):
     #print("N = ",N)
-    prevlane.recent_xpoints.pop(0) #remove oldest point only
+  #  prevlane.recent_xpoints.pop(0) #remove oldest point only
   #add new points
   if(line is not None and prevlane is not None):
     xpoints = line.fitpoints[:,0] #this is an array
+    yvals = line.fitpoints[:,1]
+    #assert(xpoints.shape == yvals.shape),str(xpoints.shape)+","+str(yvals.shape)
     xpoints = xpoints.tolist() #make this a list.
     #add to the old list.
     prevlane.recent_xpoints.append(xpoints)
+    #Now pop from top if we exceed limit
+    if(len(prevlane.recent_xpoints) > N):
+      prevlane.recent_xpoints.pop(0)
 
     line.recent_xpoints = prevlane.recent_xpoints #copy for next time
-    #calculate the new fit xpoints as average of these
+    #calculate the new fit xpoints as average of these if we have more than 1
     #print("before",prevlane.fitpoints)
-    fitx = np.mean(prevlane.recent_xpoints,axis=0)
-    line.fitpoints[:,0] = fitx
+    if(len(prevlane.recent_xpoints) > 1):
+      #print("recent_xpoints:",len(prevlane.recent_xpoints),prevlane.recent_xpoints)
+      line.fitpoints[:,0] = np.mean(prevlane.recent_xpoints,axis=0,dtype=float)
+
     #intercept where the lane meets the bottom of the image
     #line.intercept = int(fitx[-1])
     #intercept where the lane meets the top of the image
     #line.intercept0 = int(fitx[0])
     #print("after",prevlane.fitpoints)
-    yvals = prevlane.fitpoints[:,1]
+    fitx = line.fitpoints[:,0]
+    #print(line.isLeft, fitx.shape,yvals.shape)
     line.fitcoeff,_, _, _, _ = np.polyfit(yvals, fitx, 2, full=True)
-    #print("left=",line.isLeft,"fit=",fit,"residual = ",residuals)
+    #print("left=",line.isLeft,"fitcoeff=",line.fitcoeff)
     line.detected = True
   elif(prevlane is None and line is not None and line.fitpoints.shape[0] > 0):
     #print("shape",line.fitpoints.shape)
@@ -456,21 +484,27 @@ def averagelane(line, prevlane):
     line.recent_xpoints = [xpoints]
     line.detected = True
   else:
+    #print("got None line",line)
     line = prevlane
+    # we also pop history as we want only closest N pointst
+    if(prevlane is not None and len(prevlane.recent_xpoints) > 0):
+      prevlane.recent_xpoints.pop(0)
+
     if(line is not None):
       line.detected = False
+
   return line
 
 """ extrapolateleft subtracts lanewidth from right line points
 """
 def extrapolateleft(rightline):
-  LANEWIDTH = 313
+  LANEWIDTH = 280
 
   left = deepcopy(rightline)
   left.detected = False
   left.recent_xpoints = [] #initialize
   left.fitpoints[:,0] = left.fitpoints[:,0] - LANEWIDTH
-
+  print("Leftlane extrapolated")
   return left
 
 """ extrapolateright adds lanewidth to leftlane points
@@ -482,7 +516,7 @@ def extrapolateright(leftline):
   right.detected = False
   right.recent_xpoints = [] #initialize
   right.fitpoints[:,0] = right.fitpoints[:,0] + LANEWIDTH
-
+  print("rightlane extrapolated")
   return right
 
 """ final_lanes take is historic perspective. It averages best n lanes if a
@@ -501,12 +535,8 @@ def final_lanes(left, right, prevleft, prevright):
 
   if(left is None and prevleft is None and right is not None):
     left = extrapolateleft (right)
-    left.detected = False
-    print("Leftlane extrapolated")
   if(right is None and prevright is None and left is not None):
     right = extrapolateright (left)
-    right.detected = False
-    print("rightlane extrapolated")
 
   if(left is None):
     print("ASSERT: left is None")
@@ -555,6 +585,6 @@ if __name__ == '__main__':
     plt.figure(figsize=(20,10))
     plt.title(fname, fontsize=20)
     plt.imshow(resultimg) #debug display
-    print(left.isLeft,left.cfilter,left.threshold)
-    print(right.isLeft,right.cfilter,right.threshold)
+    print(left.isLeft,left.cfilter,left.threshold, left.detected)
+    print(right.isLeft,right.cfilter,right.threshold, right.detected)
     plt.show()

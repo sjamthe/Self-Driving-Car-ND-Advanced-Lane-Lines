@@ -72,7 +72,8 @@ if __name__ == '__main__':
         # If the number of captured frames is equal to the total number of frames,
         # we stop
         break
-
+    #if(pos_frame >= 10):
+    #  exit()
   cap.release()
   makemovie(images, videoout)
   print("All done!")
