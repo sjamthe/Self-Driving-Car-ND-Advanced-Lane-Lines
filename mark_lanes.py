@@ -423,15 +423,26 @@ def drawlanes(warped, leftline, rightline):
   #don't know why we need flipud yet.
   pts_left = np.array([leftline.fitpoints])
   pts_right = np.array([np.flipud(rightline.fitpoints)])
-  try:
-    pts = np.hstack((pts_left, pts_right))
-    pts = np.array(pts,'int32')
+  #try:
+  pts = np.hstack((pts_left, pts_right))
+  pts = np.array(pts,'int32')
 
-    # Draw the lane onto the warped blank image
-    cv2.fillPoly(warp_zero, pts, (0,255, 0))
-  except (ValueError):
-    print("ValueError: pts_left",pts_left)
-    print("ValueError: pts_right",pts_right)
+  # fill the spot between lanes with green on blank image
+  cv2.fillPoly(warp_zero, pts, (0,255, 0))
+  if(len(leftline.fitpoints) > 0):
+    pts = np.int32(leftline.fitpoints)
+    width=5
+    pts = np.int32(pts + [width,0]) #little shift to make it visible on yellow
+    #draw left lane
+    cv2.polylines(warp_zero, [pts], False, [255,0,255], width)
+  if(len(rightline.fitpoints) > 0):
+    pts = np.int32(rightline.fitpoints)
+    width=10
+    #pts = pts - [width,0]
+    #draw right lane
+    cv2.polylines(warp_zero, [pts], False, [255,0,255], width)
+
+    #print("ValueError: pts_right",pts_right)
   return warp_zero
 
 mtx = None
@@ -441,7 +452,7 @@ M = None
 """ averagelane : take average of last N lines
 """
 def averagelane(line, prevlane):
-  N = 3
+  N = 5
 
   #assert(line.isLeft == prevlane.isLeft), "lanes should have same isLeft"
   #if(prevlane is not None and
@@ -497,27 +508,86 @@ def averagelane(line, prevlane):
 
 """ extrapolateleft subtracts lanewidth from right line points
 """
-def extrapolateleft(rightline):
-  LANEWIDTH = 280
+def extrapolateleft(rightline, prevright):
+  LANEWIDTH = 320 #3.7 m or 12ft
 
   left = deepcopy(rightline)
+  #get prev lanewidth is available
+  if(prevright is not None):
+    lanewidth = prevright.lanewidth
+  else:
+    lanewidth = LANEWIDTH
   left.detected = False
   left.recent_xpoints = [] #initialize
-  left.fitpoints[:,0] = left.fitpoints[:,0] - LANEWIDTH
+  left.fitpoints[:,0] = left.fitpoints[:,0] - lanewidth
   print("Leftlane extrapolated")
   return left
 
 """ extrapolateright adds lanewidth to leftlane points
 """
-def extrapolateright(leftline):
-  LANEWIDTH = 280
+def extrapolateright(leftline,prevleft):
+  LANEWIDTH = 320
 
   right = deepcopy(leftline)
+  #get prev lanewidth is available
+  if(prevleft is not None):
+    lanewidth = prevleft.lanewidth
+  else:
+    lanewidth = LANEWIDTH
+
   right.detected = False
   right.recent_xpoints = [] #initialize
-  right.fitpoints[:,0] = right.fitpoints[:,0] + LANEWIDTH
+  right.fitpoints[:,0] = right.fitpoints[:,0] + lanewidth
   print("rightlane extrapolated")
   return right
+
+""" calculate road curvature and distance of car center from lane
+"""
+def calc_curvature(left, right):
+  LANEWIDTH = 320
+  lanewidth_in_m = 3.7
+  ym_per_pix = 3/230 #measured white strip to be 230 pix
+  MIDPOINT=280 #this is based on how warp was done. we basically calculate new
+                # position of midpoint in wraped image using src x points
+
+  if(left is not None and right is not None):
+    lanewidth = right.intercept - left.intercept
+    left.lane_width = lanewidth
+    right.lane_width = lanewidth
+    lanewidth = LANEWIDTH
+  else:
+    lanewidth = LANEWIDTH
+
+  if(left is not None):
+    xm_per_pix = lanewidth_in_m/lanewidth
+    yvals = left.fitpoints[:,1]*ym_per_pix
+    xvals = left.fitpoints[:,0]*xm_per_pix
+    left_fit_cr = np.polyfit(yvals, xvals, 2)
+    left.radius_of_curvature = \
+        ((1 + (2*left_fit_cr[0]*np.max(yvals) + left_fit_cr[1])**2)**1.5) \
+                / np.absolute(2*left_fit_cr[0])
+    #calculate distance of car center
+    #car is always on the midpoint of image
+    lane_center = left.intercept + lanewidth/2
+    left.line_base_pos = (MIDPOINT-lane_center)*xm_per_pix
+
+    #print("left curvature =",left.radius_of_curvature)
+    #print("car center from left lane =",left.line_base_pos)
+  if(right is not None):
+    yvals = right.fitpoints[:,1]
+    xvals = right.fitpoints[:,0]
+    xm_per_pix = lanewidth_in_m/lanewidth
+    right_fit_cr = np.polyfit(yvals*ym_per_pix, xvals*xm_per_pix, 2)
+    right.radius_of_curvature = ((1 + (2*right_fit_cr[0]*np.max(yvals) +
+                right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+    #calculate distance of car center
+    #car is always on the middle of the image which is 720/2 or 320 pix
+    #right.line_base_pos = (right.intercept-MIDPOINT)*xm_per_pix
+    #print("right curvature =",right.radius_of_curvature)
+    #print("car center from right lane =",right.line_base_pos)
+
+  return left, right
+
 
 """ final_lanes take is historic perspective. It averages best n lanes if a
   line was found. If it is not found it takes from prevlane is prev is not None
@@ -534,9 +604,11 @@ def final_lanes(left, right, prevleft, prevright):
     right = averagelane(right,prevright)
 
   if(left is None and prevleft is None and right is not None):
-    left = extrapolateleft (right)
+    left = extrapolateleft (right, prevright)
   if(right is None and prevright is None and left is not None):
-    right = extrapolateright (left)
+    right = extrapolateright (left, prevleft)
+
+  left, right = calc_curvature(left, right)
 
   if(left is None):
     print("ASSERT: left is None")
@@ -544,6 +616,25 @@ def final_lanes(left, right, prevleft, prevright):
     print("ASSERT: right is None")
 
   return left, right
+
+"""
+
+"""
+def write_curvature(img, left):
+
+  #write text to show curvature and distance of center.
+  text = "Curvature = " + str(round(left.radius_of_curvature,0)) + "m"
+  cv2.putText(img, text, (500,50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, [255,255,255],2)
+  pos = round(left.line_base_pos,2)
+  if(pos > 0):
+    postxt = "m right of center"
+  else:
+    postxt = "m left of center"
+  pos = abs(pos)
+  text = "Vehicle is " + str(pos) + postxt
+  cv2.putText(img, text, (500,80), cv2.FONT_HERSHEY_SIMPLEX, 0.8, [255,255,255],2)
+
+  return img
 
 """Wrapper to do all steps on an image, returns image with lanes
     1. takes image, prev leftlane and rightlane as input
@@ -566,6 +657,8 @@ def process_img(originalimg, prevleft=None, prevright=None):
 
   color_warp = drawlanes(warped, left, right) #draw lanes on img
   resultimg = ct.unwarp(color_warp, M, originalimg) #unwarp to original view
+
+  resultimg = write_curvature(resultimg, left)
 
   return resultimg, left, right
 

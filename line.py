@@ -19,6 +19,8 @@ class Line():
         #difference in fit coefficients between last and new fits
         #self.diffs = np.array([0,0,0], dtype='float')
 
+        #calculated lane width
+        self.lane_width = None
         #array of [x,y] values for detected line pixels
         self.points = []
 

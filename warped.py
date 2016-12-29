@@ -59,8 +59,11 @@ def four_point_transform(image, src):
         [maxWidth, maxHeight],
         [0., maxHeight]], dtype = "float32")
 
+    print("src=",src)
+    print("dst=",dst)
     # compute the perspective transform matrix and then apply it
     M = cv2.getPerspectiveTransform(src, dst)
+    print("M=",M)
     warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
 
     # return the warped image
@@ -100,8 +103,8 @@ if __name__ == '__main__':
     visualize(img,warped)
 
     M = M.tolist()
-    with open('transform.json', 'w') as f:
-        json.dump(M,f)
+    #with open('transform.json', 'w') as f:
+    #    json.dump(M,f)
 
     #let us try second images based on matrix M
     with open('transform.json', 'r') as f:

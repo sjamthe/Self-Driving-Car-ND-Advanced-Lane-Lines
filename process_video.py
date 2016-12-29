@@ -12,7 +12,8 @@ def print_results(cnt, left, right):
           left.cfilter,left.threshold,
           right.detected,len(right.points),right.fitcoeff[0],right.fitcoeff[1],
           right.fitcoeff[2],right.avgerror,right.intercept,right.intercept0,
-          right.cfilter,right.threshold)
+          right.cfilter,right.threshold,
+          left.radius_of_curvature,left.line_base_pos)
 
 "Function to write list of image filenames to a mp4 outfile"
 def makemovie(images, outfile):

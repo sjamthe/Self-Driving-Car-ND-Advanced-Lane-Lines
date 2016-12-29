@@ -16,7 +16,8 @@ def visualize(img, warped, gray,fname):
     #ax2.plot(histogram)
     ax3.imshow(gray,cmap='gray')
     ax3.set_title('Undistorted,warped gray', fontsize=20)
-    points = plt.ginput(1,timeout=20) #captures two clicks x,y coordinates in points array
+    #points = plt.ginput(1,timeout=20) #captures two clicks x,y coordinates in points array
+    plt.show()
 
 def read_calibrations():
 
@@ -50,7 +51,7 @@ def unwarp(color_warp, M, img):
   if(retval > 0):
     newwarp = cv2.warpPerspective(color_warp, Minv, (img.shape[1], img.shape[0]))
     # Combine the result with the original image
-    unwarped = cv2.addWeighted(img, 1, newwarp, 0.3, 0)
+    unwarped = cv2.addWeighted(img, 1, newwarp, 0.4, 0)
     return unwarped
 
 def normalize(rawpoints):
@@ -89,7 +90,7 @@ def V_threshold(warped, limit=80):
 
     return binary
 
-def yellow_threshold(warped, limit=180):
+def yellow_threshold(warped, limit=150):
     #input image is RGB
     r_channel = warped[:,:,0]
     g_channel = warped[:,:,1]
@@ -108,7 +109,7 @@ def yellow_threshold(warped, limit=180):
     binary[(gray > thresh[0]) & (gray <= thresh[1])] = 1
     return binary
 
-def white_threshold(warped, limit=180):
+def white_threshold(warped, limit=150):
     #input image is RGB
     r_channel = warped[:,:,0]
     g_channel = warped[:,:,1]
@@ -139,9 +140,11 @@ if __name__ == '__main__':
         print (fname)
         img = plt.imread(fname)
         warped = warp(img,mtx, dist, M)
-        binary = color_threshold(warped)
-        binary1 = color_threshold1(warped)
-        visualize(img,binary,binary1,fname)
-        cv2.imwrite('binary.jpg',binary)
-        cv2.imwrite('binary1.jpg',binary1)
+        binary = yellow_threshold(warped)
+        binary1 = white_threshold(warped)
+        #unwarp = unwarp()
+        #visualize(img,binary,binary1,fname)
+        cv2.imwrite('warped.jpg',warped)
+        cv2.imwrite('yellow.jpg',binary*255)
+        cv2.imwrite('white.jpg',binary1*255)
         break
