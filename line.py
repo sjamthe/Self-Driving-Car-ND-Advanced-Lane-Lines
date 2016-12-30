@@ -1,3 +1,7 @@
+"""
+This is a class definition for Line class used by mark_lanes.py
+
+"""
 import numpy as np
 import sys
 

@@ -1,3 +1,8 @@
+"""
+This is a library of various thresholding and color transform functions.
+It also supports warping and unwarping of image and applying camera
+calibration from transform.json and calibration.json files as input.
+"""
 import numpy as np
 import cv2
 import json

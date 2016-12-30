@@ -1,3 +1,42 @@
+"""
+This program helps us to change a 3D perspective to a 2D view so we can see the road lanes
+in parallel instead of merging in the horizon.
+It uses cv2.getPerspectiveTransform function to get a 3x3 matrix that can be used to warp
+the image from 3D to 2D.
+
+You need to run this program only once for a setting of the camera on the mount.
+Once the camera is mounted take pictures that clearly show a grid with vertical and
+horizontal parallel lines.
+
+Input two such images as input to the program. The program will display 1st image
+and expect you to select 4 points on the image. Pick a rectangle on the image
+(as wide and tall as possible). Mark the points the following order
+1. top left point
+2. top right point
+3. bottom right point
+4. bottom left point
+IMPORTANT: These points should form a rectangle in real world
+If you make small mistake selecting the points the program adjusts 2nd
+point so its x axis is in-line with point 1 and adjusts point 3 y axis to
+be same as point 2.
+
+Take a closer look at adjust_src function and change as necessary. It has
+following hard codings.
+1. It truncates image height to 0.92x as the bottom image had car bumper.
+   This may have to be removed.
+2. The program extrapolated the rectangle to the bottom of the image (.92x)
+   as we want to get lanes close to the car.
+
+NOTE: When you apply wrap from this matrix the image will only show what is in
+between the 4 points selected hence we extrapolated it to the bottom.
+
+Once the 4 points are inputed the program applies this matrix to the next image
+and shows how it will look.
+
+The program needs calibration.json to remove camera distortion. It produces
+transform.json as output that contains the transform matrix.
+
+"""
 import numpy as np
 import cv2
 import json
@@ -103,8 +142,8 @@ if __name__ == '__main__':
     visualize(img,warped)
 
     M = M.tolist()
-    #with open('transform.json', 'w') as f:
-    #    json.dump(M,f)
+    with open('transform.json', 'w') as f:
+        json.dump(M,f)
 
     #let us try second images based on matrix M
     with open('transform.json', 'r') as f:

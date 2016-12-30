@@ -1,3 +1,12 @@
+"""
+This is the main driver program that implements a pipeline to process images
+in a video.
+It reads the mp4 video file from argv[1], calls mark_lanes.process_img function
+for each image, writes the image in a folder named by argv[2].
+In the end it writes converts all the output images into a video named argv[1]-out.mp4
+
+The stdout shows all line parameters that should be redirected to a file for analysis
+"""
 from colorthreshold import *
 from mark_lanes import process_img
 import cv2

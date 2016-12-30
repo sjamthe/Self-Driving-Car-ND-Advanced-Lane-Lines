@@ -1,3 +1,6 @@
+"""
+This is simple utility to extract all the images from an mp4 video.
+"""
 import cv2
 import sys
 import os

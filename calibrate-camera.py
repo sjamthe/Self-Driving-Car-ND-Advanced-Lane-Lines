@@ -1,3 +1,22 @@
+"""
+This program is used to calibrate a camera image from lenses distortion.
+It uses openCV's findChessboardCorners and calibrateCamera functions.
+
+The input to the program is at least 9 chessboard images taken by that camera
+in several different angles (slant positions etc). These images are stored
+in camera_cal folder and are named calibration[1..n].jpg
+This program assumes the chessboard pattern has ROW_CORNERS=9 and COL_CORNERS=6
+change it if you have a different image.
+
+The output from the program is a file named calibration.json that contains
+camera Matrix and distortion coefficients returned by cv2.calibrateCamera
+
+As long as the camera focus is kept the same the calibration is needed only one.
+
+For more detail refer:
+http://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
+
+"""
 import numpy as np
 import cv2
 import glob
