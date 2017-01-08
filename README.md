@@ -6,7 +6,7 @@ This is project 4 of SDCND. It uses CV with different techniques (unwarping,thre
 calibrate-camera.py program is used to calibrate a camera image from lenses distortion. The input to the program is at least 9 chessboard images taken by that camera in several different angles (slant positions etc).
 The output from the program is a file named calibration.json that contains camera Matrix and distortion coefficients returned by cv2.calibrateCamera.
 
-## Step 2 - Create warp matrix to see top view of the road from 3D image
+## Step 2 - Create transform matrix to see top view of the road from 3D image
 warped.py program helps us to change a 3D perspective to a 2D view so we can see the road lanes in parallel instead of merging in the horizon. It uses cv2.getPerspectiveTransform function to get a 3x3 matrix that can be used to warp the image from 3D to 2D.
 
 You need to run this program only once for a setting of the camera on the mount. Once the camera is mounted take pictures that clearly show a grid with vertical and horizontal parallel lines.
@@ -15,7 +15,7 @@ Image will be 720x1280
 
 The program needs calibration.json to remove camera distortion. It produces transform.json as output that contains the transform matrix.
 
-# Show output of warped.py here
+![warped image output](./warped.png)
 
 ## Pipeline to process a video and mark lanes
 process_video.py is the main driver program that implements a pipeline to process images
