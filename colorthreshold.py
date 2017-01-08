@@ -95,6 +95,11 @@ def V_threshold(warped, limit=80):
 
     return binary
 
+"""
+Yellow threshold enhances the yellow color by removing blue color if the blue
+intensity is > 110.
+Then we grayscale the image and apply threshold.
+"""
 def yellow_threshold(warped, limit=150):
     #input image is RGB
     r_channel = warped[:,:,0]
@@ -114,6 +119,11 @@ def yellow_threshold(warped, limit=150):
     binary[(gray > thresh[0]) & (gray <= thresh[1])] = 1
     return binary
 
+"""
+A white color means RGB all three intensities are same or close. So instead of gray scaling the image
+we apply threshold only to points that have all three color intensities in the threshold range if not we
+set intensity to 0.
+"""
 def white_threshold(warped, limit=150):
     #input image is RGB
     r_channel = warped[:,:,0]

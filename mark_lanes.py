@@ -1,3 +1,8 @@
+"""
+This is the main program that uses CV techniques to mark lanes on to an image.
+process_img is the main wrapper function and entry point.
+
+"""
 import numpy as np
 import cv2
 import json
@@ -143,7 +148,12 @@ def old_region_of_interest(img, isLeft):
 
 
 """ This function removes points that don't predict the lane lines
-    We split image into vertical stripes of ver_stripes
+    1. We split image into vertical stripes that are 100 points wide on x axis.
+    2. Calculate histogram for each stripe and select stripes with maxhist
+    3. We may have multiple stripes with maxhist as lane markings are broad,
+      find how far apart they are. We permit a spread of 20 points, anything more
+      may be shadow etc.
+    4. The goal of this function is to only keep points that are atmost 20 points apart
 """
 def clean_points(points, line, width):
   newpoints = []
@@ -166,7 +176,7 @@ def clean_points(points, line, width):
     maxx = histogram[1][i[-1]+1]
     spread = maxx-minx
     #print("spread = ",spread,minx,maxx)
-    # We want to include all points that are within 50 points of each other
+    # We want to include all points that are within 20 points of each other
     SPREAD_WIDTH_LIMIT = 20 #Make this less if we get too many bad points
     if(spread <= SPREAD_WIDTH_LIMIT):
       maxspread = histogram[1][vert_stripes]-histogram[1][0]
@@ -211,9 +221,17 @@ def clean_points(points, line, width):
     #print("ASSERT: No points found after clean_points, points shape=",points.shape)
     return (points)
 
-""" given an image find the best points that can make a lane
+""" given an image find the best points that can make a line
     1. input image is color warped, apply threshold to get binary image
-    2. split the image into horizontal stripes of num_of_stripes
+       we apply a range of thresholds lower thresholds for yellowfilter range from 110-200
+       and for white filter range from 50-200
+    2. split the image into horizontal stripes of num_of_stripes (32)
+    3. create a histogram for each stripe. Each stripe is 1280/32 = 40 points high
+    4. We find the x axis location of points that have maximum histogram for each strip
+    5. points from all the strips are fed to clean_points function
+    6. polyfit a quadratic curve on he points passed by clean_points
+    7. Call comparelines to compare all lines found by this algo and select the best one
+    8. Make sure line selected by comparelines is a valid line.
 """
 def lane_points(warped, prevlane, line):
 
@@ -301,7 +319,12 @@ def lane_points(warped, prevlane, line):
   return bestline
 
 """
-  Compare the line with previous best line and return true if line is valid
+  Compare the line with previous image line and return true if line is valid.
+  1. This function compares the top and bottom x intercept of new line with prevline
+     if intercept is more than 13 we reject this line as car cannot shift so much between
+     consecutive images, so this line may not be valid.
+  2. The fitcoeff[1] of this line is like a slope, we want to make sure it is > 0.75 for valid lines
+  3. We apply leftlimit and rightlimit for the lines as the lanes cannot go far away from the image
 """
 def islinevalid(prevlane, line):
 
@@ -350,6 +373,10 @@ def islinevalid(prevlane, line):
     if the line is valid line compared with prevline then it compares it with
     last bestline and returns the one that is best.
     It returns None is line is not valid and last bestline is None
+    Logic: This functions assumes that any good line should have at least 4 unique points
+    to describe the line. When we compare 2 lines the one with more unique points (upto 10)
+    is preferred. If lines have > 10 unique points then we prefer line that has less spread
+    i.e its points are closer to each other.
 """
 def comparelines(prevlane, bestline, line):
 
@@ -406,8 +433,9 @@ def comparelines(prevlane, bestline, line):
   return bestline
 
 """ Given an input image find the best points that can make a lane
-    1. calls lane_points with various color filters
-    2. from points returned from lane_points calculate best_fit_poly
+    0. Apply region_of_interest
+    1. calls lane_points with various color filters (yellow and white)
+    2. call comparelines to compare lines from all filters and select best one
     3. compare lane for each color filter with last n images
     4. returns best lane
 """
@@ -512,7 +540,7 @@ mtx = None
 dist = None
 M = None
 
-""" averagelane : take average of last N lines
+""" averagelane : take average of last N lanes
 """
 def averagelane(line, prevlane):
   N = 5
@@ -661,7 +689,7 @@ def calc_curvature(left, right):
 
 
 """ final_lanes take is historic perspective. It averages best n lanes if a
-  line was found. If it is not found it takes from prevlane is prev is not None
+  line was found. If it is not found it takes from prevlane, if prev is not None
   if prevlane is None is decided lane based on parallel lane available
 """
 def final_lanes(left, right, prevleft, prevright):
@@ -689,7 +717,8 @@ def final_lanes(left, right, prevleft, prevright):
   return left, right
 
 """
-
+Writes the curvature of the road and distance of car center from lane center
+on the image
 """
 def write_curvature(img, left):
 
