@@ -105,6 +105,7 @@ comparelines compares current line with prev line
 if the line is valid line compared with prevline then it compares it with
 last bestline and returns the one that is best.
 It returns None is line is not valid and last bestline is None
+
 Logic: This functions assumes that any good line should have at least 4 unique points
 to describe the line. When we compare 2 lines the one with more unique points (upto 10)
 is preferred. If lines have > 10 unique points then we prefer line that has less spread
