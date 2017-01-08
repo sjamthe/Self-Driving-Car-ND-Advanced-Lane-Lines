@@ -31,6 +31,7 @@ Program mark_lanes.py has all the logic of identifying the lanes, marking them a
 
 ### Process_img function
 This function is the main entry point, it takes front image as an input along with prev lanes.
+
 1. It calibrates the image for camera distortion using calibration.json
 2. It transforms the image using transform.json so we get top view of the lanes.
 3. It calls extract_lanes function that has all the logic of converting image to lanes.
@@ -45,6 +46,7 @@ This function is the main entry point, it takes front image as an input along wi
 
 ### best_fit_line function
 Given an input image find the best points that can make a lane
+
 1. Apply region_of_interest
 2. calls lane_points with various color filters (yellow and white)
 3. call comparelines to compare lines from all filters and select best one
@@ -67,6 +69,7 @@ set intensity to 0.
 
 ### lane_points function
 Given an image find the best points that can make a line
+
 1. input image is color warped, apply threshold to get binary image
    we apply a range of thresholds lower thresholds for yellowfilter range from 110-200
    and for white filter range from 50-200
@@ -80,6 +83,7 @@ Given an image find the best points that can make a line
 
 ### cleanpoints function
 This function removes points that don't predict the lane lines
+
 1. We split image into vertical stripes that are 100 points wide on x axis.
 2. Calculate histogram for each stripe and select stripes with maxhist
 3. We may have multiple stripes with maxhist as lane markings are broad,
@@ -89,6 +93,7 @@ This function removes points that don't predict the lane lines
 
 ### isLineValid function
 Compare the line with previous image line and return true if line is valid.
+
 1. This function compares the top and bottom x intercept of new line with prevline
  if intercept is more than 13 we reject this line as car cannot shift so much between
  consecutive images, so this line may not be valid.
