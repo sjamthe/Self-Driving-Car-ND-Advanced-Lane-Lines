@@ -111,3 +111,11 @@ to describe the line. When we compare 2 lines the one with more unique points (u
 is preferred. If lines have > 10 unique points then we prefer line that has less spread
 i.e its points are closer to each other.
 
+---
+
+## Discussion
+This project was a very good introduction to advanced Computer Vision techniques. The lane detection was far better than project 1 after the perspective transform and ability to predict curves.
+For me the biggest challenge remains detecting lane lines by using various color spaces and thresholds. As you notice I tried two different color filters to look at yellow and white lanes and applied various thresholds in a loop.
+
+Now that I have learnt about HOG features and other features in project 5 (vehicle detection), I am thinking of trying some of those techniques along with a classifier to detect lanes. Another option is to train a CNN that I used for project 3 to predict steering angle to actually predict lane coordinates. 
+
